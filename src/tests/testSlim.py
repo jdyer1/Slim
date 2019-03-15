@@ -34,36 +34,36 @@ def test_compare_with_reference_implementation_gain():
     compareRefImpl("gain")
 
 def runSlim(desc, X, method):    
-        start = timer()
-        totalTime = 0    
-        
-        s = Slim.Slim(method)
-        compressed = s.fit_transform(X)
-        (start, totalTime) = logTime(desc + " fit-transform", start, totalTime)   
-        
-        originalSize = matrixSize(X) 
-        codeTable = s.get_code_table()     
-        xref = s.get_feature_cross_reference()        
-        totalSize = compute_total_size(s, compressed)
-        print("original size", originalSize, "total compressed size", totalSize) 
-        (start, totalTime) = logTime(desc + " return codetable & xref", start, totalTime)        
-        
-        assert totalSize < originalSize, "compressed size is not less than original: " + desc        
-        assert isCodeTableInStandardCoverOrder(codeTable), "code table not in standard cover order."
-        
-        decompressed = s.decompress() 
-        (start, totalTime) = logTime(desc + " decompress method 1", start, totalTime)   
-        assert matrixEquals(X, decompressed), "decompressed (method 1) is not the same as the original: " + desc
-        
-        decompressed = s.decompress(compressed, codeTable, xref)
-        (start, totalTime) = logTime(desc + " decompress method 2", start, totalTime)   
-        assert matrixEquals(X, decompressed), "decompressed (method 2) is not the same as the original: " + desc
-        
-        compressed1 = s.transform(X)
-        (start, totalTime) = logTime(desc + " transform", start, totalTime)
-        decompressed = s.decompress(compressed1)
-        (start, totalTime) = logTime(desc + " decompress method 3", start, totalTime)
-        assert matrixEquals(X, decompressed), "decompressed (method 3) is not the same as the original: " + desc
+    start = timer()
+    totalTime = 0    
+    
+    s = Slim.Slim(method)
+    compressed = s.fit_transform(X)
+    (start, totalTime) = logTime(desc + " fit-transform", start, totalTime)   
+    
+    originalSize = matrixSize(X) 
+    codeTable = s.get_code_table()     
+    xref = s.get_feature_cross_reference()        
+    totalSize = compute_total_size(s, compressed)
+    print("original size", originalSize, "total compressed size", totalSize) 
+    (start, totalTime) = logTime(desc + " return codetable & xref", start, totalTime)        
+    
+    assert totalSize < originalSize, "compressed size is not less than original: " + desc        
+    assert isCodeTableInStandardCoverOrder(codeTable), "code table not in standard cover order."
+    
+    decompressed = s.decompress() 
+    (start, totalTime) = logTime(desc + " decompress method 1", start, totalTime)   
+    assert matrixEquals(X, decompressed), "decompressed (method 1) is not the same as the original: " + desc
+    
+    decompressed = s.decompress(compressed, codeTable, xref)
+    (start, totalTime) = logTime(desc + " decompress method 2", start, totalTime)   
+    assert matrixEquals(X, decompressed), "decompressed (method 2) is not the same as the original: " + desc
+    
+    compressed1 = s.transform(X)
+    (start, totalTime) = logTime(desc + " transform", start, totalTime)
+    decompressed = s.decompress(compressed1)
+    (start, totalTime) = logTime(desc + " decompress method 3", start, totalTime)
+    assert matrixEquals(X, decompressed), "decompressed (method 3) is not the same as the original: " + desc
 
 def compareRefImpl(method):
     '''
@@ -234,12 +234,12 @@ def loadReferenceImplCodeTable(slimMjCodeTableFilename, featureIdXref, exampleId
             
 
 def logTime(label, start, totalTime):
-        end = timer()
-        used = end - start
-        totalTime += used
-        print(label + " time used", used, "total so far", totalTime)
-        start = end   
-        return (start, totalTime)     
+    end = timer()
+    used = end - start
+    totalTime += used
+    print(label + " time used", used, "total so far", totalTime)
+    start = end   
+    return (start, totalTime)     
 
 def matrixSize(mat):
     if scipy.sparse.issparse(mat):

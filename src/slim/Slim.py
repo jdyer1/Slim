@@ -61,7 +61,7 @@ class Slim(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
         X = check_array(X, accept_sparse=['csr'])
         self.totalFeatures_ = X.shape[1]
-        (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId) = self.loadData(X, y)
+        (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId, featureIdByExampleIds) = self.loadData(X, y)
         
         self.dtype_ = X.dtype
         self.totalElements_ = totalElements
@@ -89,7 +89,7 @@ class Slim(BaseEstimator, TransformerMixin):
         self.codeTable_ = codeTable
         self.databaseLength_ = databaseLength 
         self.codeTableSize_ = codeTableSize
-        self.numUsedFeatures_ = len(codeTable)       
+        self.numUsedFeatures_ = len(codeTable) 
         
         self.candidates_ = []
         self.generateInitialCandidates() 
@@ -149,15 +149,28 @@ class Slim(BaseEstimator, TransformerMixin):
         if X.shape[1] != self.totalFeatures_:
             raise ValueError("matrix to transform should have the same features as fit matrix: " + str(self.totalFeatures_))
         
-        (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId) = self.loadData(X)
+        (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId, featureIdByExampleIds) = self.loadData(X, None, True)
         
         
         codeTable = []
+        codeTableFeatureIds = set()
         for feature in self.codeTable_:
             f1 = copy.copy(feature)
-            f1.exampleIds = exampleIdsByfeatureId.get(feature.featureId, set())
-            codeTable.append(f1)        
+            codeTable.append(f1)   
+            codeTableFeatureIds.add(f1.featureId)
         
+        for featureId in exampleIdsByfeatureId:
+            if featureId not in codeTableFeatureIds:  
+                codeTable.append(Feature(featureId, 1, set([featureId])))
+        
+        for (exampleId, featureIds) in featureIdByExampleIds.items():
+            for f in codeTable:
+                if f.components.issubset(featureIds):
+                    featureIds = featureIds.difference(f.components)
+                    f.exampleIds.add(exampleId)
+                    f.support = f.support + 1
+                       
+                
         return self.do_transform(codeTable)
     
     def do_transform(self, codeTable=None):
@@ -200,23 +213,22 @@ class Slim(BaseEstimator, TransformerMixin):
         
         return dict(featureDescById)
     
-    def loadData(self, X, y=None):
+    def loadData(self, X, y=None, returnXref=False):
         if y is not None:
             y = check_array(y, accept_sparse=True, ensure_2d=False, allow_nd=True, ensure_min_samples=0, ensure_min_features=0)
             if len(y)>0:
                 warnings.warn("This estimator works on unlabelled data; Y is ignored", RuntimeWarning)
                 
         if(scipy.sparse.issparse(X)):
-            return self.loadDataSparse(X)
+            return self.loadDataSparse(X, returnXref)
         else:
-            return self.loadDataDense(X)        
+            return self.loadDataDense(X, returnXref)        
     
-    def loadDataSparse(self, X):        
-        featureDescById = {} if self.featureDescById_ is None else self.featureDescById_.copy()
-        featureIdByDesc = {}         
+    def loadDataSparse(self, X, returnXref=False):        
+        (featureDescById, featureIdByDesc) = self.initializeFeatureCrossReference()
         exampleIdsByfeatureId = {}
-        
-        nextFeatureId = 0
+        featureIdByExampleIds = {} if returnXref else None
+        nextFeatureId = self.nextFeatureId_
         
         for (rowId, row) in enumerate(X):
             for (i, idx) in enumerate(row.indices):
@@ -231,21 +243,23 @@ class Slim(BaseEstimator, TransformerMixin):
                 
                 exampleIdsByfeatureId.setdefault(featureId, set()).add(rowId)
                 
+                if featureIdByExampleIds is not None:
+                    featureIdByExampleIds.setdefault(rowId, set()).add(featureId)
+                
         totalElements = len(X.data)
-        return (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId)
+        return (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId, featureIdByExampleIds)
     
     
-    def loadDataDense(self, X): 
-        featureDescById = {} if self.featureDescById_ is None else self.featureDescById_.copy()
-        featureIdByDesc = {}
-        exampleIdsByfeatureId = {}
-        
-        nextFeatureId = 0
+    def loadDataDense(self, X, returnXref=False): 
+        (featureDescById, featureIdByDesc) = self.initializeFeatureCrossReference()
+        exampleIdsByfeatureId = {} 
+        featureIdByExampleIds = {} if returnXref else None
+        nextFeatureId = self.nextFeatureId_
         totalElements = 0
         
         for (rowId, row) in enumerate(X):
             for (idx, element) in enumerate(row):
-                if element is not None and element != 0:
+                if element is not None:
                     totalElements += 1
                     featureDesc = (idx, element)                
                     featureId = featureIdByDesc.get(featureDesc)
@@ -256,8 +270,23 @@ class Slim(BaseEstimator, TransformerMixin):
                         featureDescById[featureId] = featureDesc
                 
                     exampleIdsByfeatureId.setdefault(featureId, set()).add(rowId)
+                    
+                    if featureIdByExampleIds is not None:
+                        featureIdByExampleIds.setdefault(rowId, set()).add(featureId)
                 
-        return (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId)
+        return (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId, featureIdByExampleIds)
+    
+    def initializeFeatureCrossReference(self):
+        if self.featureDescById_ is None:
+            featureDescById = {}
+            featureIdByDesc = {}
+        else:
+            featureDescById = self.featureDescById_.copy()
+            featureIdByDesc = {}
+            for (featureId, featureDesc) in featureDescById.items():
+                featureIdByDesc[featureDesc] = featureId
+            
+        return (featureDescById, featureIdByDesc)
     
     def generateInitialCandidates(self):
         self.codeTable_ = sorted(self.codeTable_)
