@@ -90,7 +90,7 @@ def compareRefImpl(method):
     '''
     We re-load the data to obtain "exampleIdsByFeatureId" which the implementation discards
     '''
-    (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId) = s.loadData(X)
+    (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId, featureIdByExampleIds) = s.loadData(X)
     
     '''
     Now we load the SlimMJ code table, being careful to translate 
