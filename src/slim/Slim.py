@@ -20,6 +20,9 @@ class Slim(BaseEstimator, TransformerMixin):
         - 'gain' - lengths are calculated using the gain formula given in 
             section 3.3 in [1].
     
+    na_value : number, optional (default=0)
+        - Specify a value to ignore, in addition to None.
+    
     Attributes
     ----------
     codeTable_ : A list of Feature obects containing:
@@ -40,9 +43,10 @@ class Slim(BaseEstimator, TransformerMixin):
             SLIM: Directly mining description patterns. SDM12.
                 
     '''
-    def __init__(self, method="count"):
+    def __init__(self, method="count", na_value=0):
         method = "count" if method is None else method
         self.cl_ = LengthCalculator(method=method)
+        self.na_value_ = na_value
         
         self.totalFeatures_ = None
         self.totalElements_ = 0   
@@ -179,22 +183,35 @@ class Slim(BaseEstimator, TransformerMixin):
         
         ct = self.codeTable_ if codeTable is None else codeTable
         
+        unusedFeatureIds = set(self.featureDescById_)
         for f in ct: 
             for exampleId in f.exampleIds:
                 maxExampleId = max(maxExampleId, exampleId)
                 featureIds = featureIdsByExampleIds.setdefault(exampleId, [])
                 featureIds.append(f.featureId)
+                unusedFeatureIds.discard(f.featureId)
+                
+        if len(unusedFeatureIds) == 0:
+            unusedFeatureIds = None       
         
         indptr = [0]
         indices = []
         data = []  
-        for i in range(0,maxExampleId + 1):
+        for i in range(0,maxExampleId + 1):              
             featureIds = featureIdsByExampleIds.setdefault(i, [])
             for featureId in featureIds:
                 indices.append(featureId)
                 data.append(1)
+            
+            # This is to pass sklearn/utils/estimator_checks._apply_on_subsets
+            # cf, https://github.com/scikit-learn/scikit-learn/commit/989f9c764734efc21bbff21b0202b52a1112bfc3
+            if unusedFeatureIds is not None and i==0:
+                for unusedFeatureId in unusedFeatureIds:
+                    indices.append(unusedFeatureId)
+                    data.append(0) 
+                                       
             indptr.append(len(indices))
-        mat = scipy.sparse.csr_matrix((data, indices, indptr), dtype=np.int8)
+        mat = scipy.sparse.csr_matrix((data, indices, indptr), dtype=self.dtype_)
         return mat
                 
     def get_code_table(self):
@@ -233,18 +250,19 @@ class Slim(BaseEstimator, TransformerMixin):
         for (rowId, row) in enumerate(X):
             for (i, idx) in enumerate(row.indices):
                 element = row.data[i]
-                featureDesc = (idx, element)                
-                featureId = featureIdByDesc.get(featureDesc)
-                if featureId is None:
-                    featureId = nextFeatureId
-                    nextFeatureId += 1
-                    featureIdByDesc[featureDesc] = featureId
-                    featureDescById[featureId] = featureDesc
-                
-                exampleIdsByfeatureId.setdefault(featureId, set()).add(rowId)
-                
-                if featureIdByExampleIds is not None:
-                    featureIdByExampleIds.setdefault(rowId, set()).add(featureId)
+                if element is not None and element != self.na_value_:
+                    featureDesc = (idx, element)                
+                    featureId = featureIdByDesc.get(featureDesc)
+                    if featureId is None:
+                        featureId = nextFeatureId
+                        nextFeatureId += 1
+                        featureIdByDesc[featureDesc] = featureId
+                        featureDescById[featureId] = featureDesc
+                    
+                    exampleIdsByfeatureId.setdefault(featureId, set()).add(rowId)
+                    
+                    if featureIdByExampleIds is not None:
+                        featureIdByExampleIds.setdefault(rowId, set()).add(featureId)
                 
         totalElements = len(X.data)
         return (totalElements, nextFeatureId, featureDescById, exampleIdsByfeatureId, featureIdByExampleIds)
@@ -259,9 +277,9 @@ class Slim(BaseEstimator, TransformerMixin):
         
         for (rowId, row) in enumerate(X):
             for (idx, element) in enumerate(row):
-                if element is not None:
+                if element is not None and element != self.na_value_:
                     totalElements += 1
-                    featureDesc = (idx, element)                
+                    featureDesc = (idx, element) 
                     featureId = featureIdByDesc.get(featureDesc)
                     if featureId is None:
                         featureId = nextFeatureId
@@ -391,8 +409,12 @@ class Slim(BaseEstimator, TransformerMixin):
             
             for (exampleId, example) in enumerate(transformed):
                 allComponents = set()
-                for featureId in example.indices:                    
-                    allComponents.update(codeTableByFeatureId[featureId])
+                
+                for i in range(0, len(example.indices)):
+                    featureId = example.indices[i]
+                    if example.data[i] == 1:         
+                        allComponents.update(codeTableByFeatureId[featureId])
+                
                 tuples = []
                 for componentId in allComponents:
                     idxAndVal = feature_cross_reference[componentId]

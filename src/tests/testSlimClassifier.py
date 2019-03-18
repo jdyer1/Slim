@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from slim import SlimClassifier
 from sklearn.preprocessing import KBinsDiscretizer
 from timeit import default_timer as timer
+import unittest
 
 
 def test_iris():
@@ -14,13 +15,13 @@ def test_iris():
     y = dataset.target
     classify("iris", X, y)    
 
-# Too Slow for unit test
-#def test_digits():   
-#    dataset = datasets.load_digits(n_class=10, return_X_y=False)
-#    classify("digits", dataset.data, dataset.target)
+@unittest.skip("slow")
+def test_digits():   
+    dataset = datasets.load_digits(n_class=10, return_X_y=False)
+    classify("digits", dataset.data, dataset.target)
 
 def classify(label, X, y): 
-    clf = SlimClassifier.SlimClassifier()
+    clf = SlimClassifier.SlimClassifier(na_value=None)
     (X_train, X_test, y_train, y_test) = train_test_split(X, y, test_size=0.2, random_state=1, shuffle=True)
     
     start = timer()
@@ -52,3 +53,5 @@ def logTime(label, start, totalTime):
 if __name__ == '__main__':
     test_iris()
     test_digits()
+    
+    

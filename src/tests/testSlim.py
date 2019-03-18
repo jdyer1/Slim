@@ -39,7 +39,14 @@ def runSlim(desc, X, method):
     
     s = Slim.Slim(method)
     compressed = s.fit_transform(X)
-    (start, totalTime) = logTime(desc + " fit-transform", start, totalTime)   
+    (start, totalTime) = logTime(desc + " fit-transform", start, totalTime)
+    
+    s1 = Slim.Slim(method)
+    s1.fit(X)
+    (start, totalTime) = logTime(desc + " fit (only)", start, totalTime)
+    compressed0 = s1.transform(X)
+    (start, totalTime) = logTime(desc + " transform (only)", start, totalTime)
+    assert matrixEquals(compressed, compressed0), "fit_transform should return the same as fit, followed by transform."
     
     originalSize = matrixSize(X) 
     codeTable = s.get_code_table()     
@@ -144,7 +151,7 @@ def loadData(csvFilename):
                     data.append(1)
             indptr.append(len(indices))                
     
-    return scipy.sparse.csr_matrix((data, indices, indptr), dtype=np.int8)
+    return scipy.sparse.csr_matrix((data, indices, indptr), dtype=np.int16)
 
 def loadReferenceImplCodeTable(slimMjCodeTableFilename, featureIdXref, exampleIdsByfeatureId):
     '''
@@ -286,3 +293,6 @@ def matrixEquals(m1, m2):
         return comp.all()
     return comp
 
+if __name__ == '__main__':
+    test_slim_sparse_count()
+    test_slim_dense_count()

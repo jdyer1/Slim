@@ -2,17 +2,45 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from slim import Slim
 import numpy as np
 import scipy.sparse
-import io
 
 
 class SlimClassifier(BaseEstimator, ClassifierMixin):
     '''
-    classdocs
+    Classifier using the SLIM compression algorithm.
+    
+    One SLIM compressor instance per n classes is created.  
+    Each unseen example is compressed using each of n SLIM instances.
+    The unseen example is assigned to that class which achieves the best
+    compression.  See [1] section 6.3.
+    
+    Parameters
+    ----------
+    method : string, optional (default='count')
+        - 'count' - lengths are calculating by counting the number of elements
+        - 'gain' - lengths are calculated using the gain formula given in 
+            section 3.3 in [1].
+    
+    na_value : number, optional (default=0)
+        - Specify a value to ignore, in addition to None.
+    
+    Attributes
+    ----------
+    classes_ : A list of possible classes
+    class_X_ : A list, each element is a subset of X with those examples having
+        the class in "classes_" with the corresponding index.
+    class_models_ : A list of SLIM instances corresponding to "classes_"    
+        
+    References
+    ----------
+    .. [1] K. Smets and J. Vreeken (2012) 
+            SLIM: Directly mining description patterns. SDM12.
+                
     '''
 
 
-    def __init__(self, method="count"):
-        self.method = method
+    def __init__(self, method="count", na_value=0):
+        self.method_ = method
+        self.na_value_ = na_value
     
     def fit(self, X, y):
         """Fit the model according to the given training data.
@@ -37,7 +65,7 @@ class SlimClassifier(BaseEstimator, ClassifierMixin):
         for c in self.classes_:
             hasC = y==c
             self.class_X_.append(X[hasC])
-            self.class_models_.append(Slim.Slim(self.method))
+            self.class_models_.append(Slim.Slim(method=self.method_, na_value=self.na_value_))
         
         for i in range(0, len(self.class_X_)):
             model = self.class_models_[i]
@@ -56,22 +84,19 @@ class SlimClassifier(BaseEstimator, ClassifierMixin):
             for i in range(0, len(self.class_models_)):
                 model = self.class_models_[i]
                 transformed = model.transform(row.reshape(1, -1))
-                transformedSize = matrixSize(transformed)
+                transformedSize = self.matrixSize(transformed)
                 if minSize is None or minSize > transformedSize:
                     minSize = transformedSize
                     minIndex = i
             predictions.append(minIndex)
         return np.array(predictions)    
     
-    #D = self.decision_function(X)
-    #return self.classes_[np.argmax(D, axis=1)]
-
-def matrixSize(mat):
-    if scipy.sparse.issparse(mat):
-        return len(mat.data) + len(mat.indices) + len(mat.indptr)
-    else:
-        return len(np.nonzero(mat)[0]) * 2 + mat.shape[0]
-    
+    def matrixSize(self, mat):
+        if scipy.sparse.issparse(mat):
+            return len(mat.data) + len(mat.indices) + len(mat.indptr)
+        else:
+            return len(np.nonzero(mat)[0]) * 2 + mat.shape[0]
+        
     
     
 
