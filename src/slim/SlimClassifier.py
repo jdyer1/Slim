@@ -11,7 +11,7 @@ class SlimClassifier(BaseEstimator, ClassifierMixin):
     One SLIM compressor instance per n classes is created.  
     Each unseen example is compressed using each of n SLIM instances.
     The unseen example is assigned to that class which achieves the best
-    compression.  See [1] section 6.3.
+    compression.  See [1] section 6.7.
     
     Parameters
     ----------
