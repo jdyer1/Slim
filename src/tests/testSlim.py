@@ -250,7 +250,7 @@ def logTime(label, start, totalTime):
 
 def matrixSize(mat):
     if scipy.sparse.issparse(mat):
-        return len(mat.data) + len(mat.indices) + len(mat.indptr)
+        return (len(np.nonzero(mat.data)[0]) * 2) + len(mat.indptr)
     else:
         return len(np.nonzero(mat)[0]) * 2 + mat.shape[0]
 

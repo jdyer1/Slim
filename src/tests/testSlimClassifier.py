@@ -39,7 +39,7 @@ def classify(label, X, y):
     
     (start, totalTime) = logTime(label, start, totalTime)
     
-    print(label, "correct", numCorrect, "incorrect", numIncorrect, "percentCorrect", percCorrect)
+    print(label, "correct", numCorrect, "incorrect", numIncorrect, "%Correct", percCorrect)
     assert percCorrect > .8, "Less than 80% correct"
 
 def logTime(label, start, totalTime):
@@ -50,8 +50,5 @@ def logTime(label, start, totalTime):
     start = end   
     return (start, totalTime)
 
-if __name__ == '__main__':
-    test_iris()
-    test_digits()
     
     
