@@ -7,11 +7,14 @@ from sklearn.preprocessing import KBinsDiscretizer
 from timeit import default_timer as timer
 import unittest
 
+@unittest.skip("check_classifiers_train requires >.83 accuracy on a 2-feature training set, but we only achieve .77")
+def test_compatibility():
+    sc = SlimClassifier.SlimClassifier(na_value=1, transform_function=bin_data_function)
+    check_estimator(sc)
 
 def test_iris():
     dataset = datasets.load_iris()
-    kbd = KBinsDiscretizer(n_bins=10, encode='ordinal', strategy='uniform')
-    X = kbd.fit_transform(dataset.data)
+    X = bin_data_function(dataset.data)
     y = dataset.target
     classify("iris", X, y)    
 
@@ -19,6 +22,11 @@ def test_iris():
 def test_digits():   
     dataset = datasets.load_digits(n_class=10, return_X_y=False)
     classify("digits", dataset.data, dataset.target)
+
+def bin_data_function(X):
+    kbd = KBinsDiscretizer(n_bins=10, encode='ordinal', strategy='uniform')
+    return kbd.fit_transform(X)
+
 
 def classify(label, X, y): 
     clf = SlimClassifier.SlimClassifier(na_value=None)
@@ -50,5 +58,6 @@ def logTime(label, start, totalTime):
     start = end   
     return (start, totalTime)
 
-    
+if __name__ == '__main__':
+    test_compatibility()
     

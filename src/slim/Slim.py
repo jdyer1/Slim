@@ -211,7 +211,10 @@ class Slim(BaseEstimator, TransformerMixin):
                     data.append(0) 
                                        
             indptr.append(len(indices))
-        mat = scipy.sparse.csr_matrix((data, indices, indptr), dtype=self.dtype_)
+        if len(data) == 0:
+            mat = scipy.sparse.csr_matrix((0,0))
+        else:
+            mat = scipy.sparse.csr_matrix((data, indices, indptr), dtype=self.dtype_)        
         return mat
                 
     def get_code_table(self):
