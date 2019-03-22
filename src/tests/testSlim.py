@@ -48,7 +48,7 @@ def runSlim(desc, X, method):
     (start, totalTime) = logTime(desc + " transform (only)", start, totalTime)
     assert matrixEquals(compressed, compressed0), "fit_transform should return the same as fit, followed by transform."
     
-    originalSize = matrixSize(X) 
+    originalSize = Slim.matrixSize(X) 
     codeTable = s.get_code_table()     
     xref = s.get_feature_cross_reference()        
     totalSize = compute_total_size(s, compressed)
@@ -130,7 +130,7 @@ def compareRefImpl(method):
 def compute_total_size(slim, compressedMatrix):
     codeTable = slim.get_code_table()
     xref = slim.get_feature_cross_reference()
-    compressedSize = matrixSize(compressedMatrix)
+    compressedSize = Slim.matrixSize(compressedMatrix)
     codetableSize = codeTableSize(codeTable)
     xrefSize = len(xref) * 3
     totalSize = compressedSize + codetableSize + xrefSize
@@ -247,12 +247,6 @@ def logTime(label, start, totalTime):
     print(label + " time used", used, "total so far", totalTime)
     start = end   
     return (start, totalTime)     
-
-def matrixSize(mat):
-    if scipy.sparse.issparse(mat):
-        return (len(np.nonzero(mat.data)[0]) * 2) + len(mat.indptr)
-    else:
-        return len(np.nonzero(mat)[0]) * 2 + mat.shape[0]
 
 def isCodeTableInStandardCoverOrder(ct):
     lastFeatureId = None

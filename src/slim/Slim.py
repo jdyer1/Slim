@@ -430,6 +430,17 @@ class Slim(BaseEstimator, TransformerMixin):
             mat = scipy.sparse.csr_matrix((data, indices, indptr), dtype=self.dtype_)
             return mat
 
+
+def matrixSize(mat):
+    '''
+    callable from outside class instance
+    '''
+    if scipy.sparse.issparse(mat):
+        return (len(np.nonzero(mat.data)[0]) * 2) + len(mat.indptr)
+    else:
+        return len(np.nonzero(mat)[0]) * 2 + mat.shape[0]
+
+
 class LengthCalculator:
     def __init__(self, method):
         if method == 'count':

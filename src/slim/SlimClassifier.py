@@ -3,7 +3,6 @@ from sklearn.utils import check_array, check_X_y
 from sklearn.multiclass import check_classification_targets
 from slim import Slim
 import numpy as np
-import scipy.sparse
 from astropy.wcs.docstrings import row
 
 
@@ -31,7 +30,7 @@ class SlimClassifier(BaseEstimator, ClassifierMixin):
     na_value : number, optional (default=0)
         - Specify a value to ignore, in addition to None.
         
-    transform_function : function, optional (derfault=0)
+    transform_function : function, optional (default=None)
         - Function to transform the data.  If using scikit-learn >= 0.20,
             it is generally helpful to use KBinsDiscretizer on continuous features
             with encode='ordinal' and strategy='uniform' .
@@ -116,19 +115,12 @@ class SlimClassifier(BaseEstimator, ClassifierMixin):
                 model = self.class_models_[i]
                 if model is not None:
                     transformed = model.transform(row_transformed)
-                    transformedSize = self.matrixSize(transformed)
+                    transformedSize = Slim.matrixSize(transformed)
                     if minSize is None or minSize > transformedSize:
                         minSize = transformedSize
                         minIndex = i
             predictions.append(self.classes_[0] if minIndex is None else self.classes_[minIndex])
         return np.array(predictions)    
-    
-    def matrixSize(self, mat):
-        if scipy.sparse.issparse(mat):
-            return (len(np.nonzero(mat.data)[0]) * 2) + len(mat.indptr)
-        else:
-            return len(np.nonzero(mat)[0]) * 2 + mat.shape[0]
-        
     
     def __copy__(self):
         return SlimClassifier(method=self.method, na_value=self.na_value, transform_function=self.transform_function)
