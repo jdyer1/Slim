@@ -77,7 +77,7 @@ class SlimOutlierDetector(BaseEstimator):
         sizesUncompressed = (uncompressed != 0).sum(1)
         sizesCompressed = (compressed != 0).sum(1)
         length = []
-        #totalElements_
+        
         if self.compress_eval_method != "length" \
             and self.compress_eval_method != "difference" \
             and self.compress_eval_method != "percent":

@@ -2,13 +2,11 @@ import numpy as np
 from sklearn.utils.estimator_checks import check_estimator
 from sklearn.metrics import confusion_matrix
 from slim import SlimOutlierDetector
-from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import KBinsDiscretizer
 from timeit import default_timer as timer
 import scipy.sparse
 import os
 import csv
-import unittest
 
 def test_compatibility():
     sc = SlimOutlierDetector.SlimOutlierDetector()
@@ -31,14 +29,6 @@ def test_wbc():
     detect("wbc", True, X, y)    
  
     
-def test_letter():
-    '''
-    Letter dataset - http://odds.cs.stonybrook.edu/letter-recognition-dataset/
-    '''
-    X = loadData("letter_X.csv")
-    y = [1 if x==0 else -1 for x in loadData("letter_y.csv").data]
-    detect("wbc", False, X, y) 
-
 def test_glass():
     '''
     Glass dataset - http://odds.cs.stonybrook.edu/glass-data/
@@ -53,26 +43,37 @@ def bin_data_function(X):
     return kbd.fit_transform(X)
 
 def detect(label, bin_data, X, y):     
-    for calc in ['length', 'difference', 'percent', 'forest']:    
-        if calc=="forest":
-            clf = IsolationForest(behaviour="new", contamination="auto")
-        else:
-            transform_function=None
-            if bin_data: 
-                transform_function=bin_data_function     
-            clf = SlimOutlierDetector.SlimOutlierDetector(compress_eval_method=calc, transform_function=transform_function)
-        
+    percCorrect = []
+    percFalsePositive = []
+    percFalseNegative = []
+    for calc in ['length', 'difference', 'percent']:   
+        transform_function=None
+        if bin_data: 
+            transform_function=bin_data_function     
+        clf = SlimOutlierDetector.SlimOutlierDetector(compress_eval_method=calc, transform_function=transform_function)        
         is_inlier = clf.fit(X).predict(X)     
         correct = y == is_inlier
         numCorrect = np.sum(correct)
         numIncorrect = len(correct) - numCorrect
-        (tn, fp, fn, tp) = confusion_matrix(y, is_inlier).ravel()             
-        print(label, calc, numCorrect, numIncorrect, perc(numCorrect, numIncorrect), tn, fp, perc(tn, fp), fn, tp, perc(fn, tp), sep=",")
-    
-    #assert percCorrect > .97, "Less than 97% correct"
+        (tn, fp, fn, tp) = confusion_matrix(y, is_inlier).ravel()
+        pc = perc(numCorrect, numIncorrect)
+        pfp = perc(tn, fp)
+        pfn = perc(fn, tp)
+        percCorrect.append(pc)
+        percFalsePositive.append(pfp)
+        percFalseNegative.append(pfn)
+        print(label, calc, numCorrect, numIncorrect, fmtPerc(pc), tn, fp, fmtPerc(pfp), fn, tp, fmtPerc(pfn), sep=",")
+        
+    assert max(percCorrect) > .90, "Did not achieve >90% correct"
+    assert min(percFalsePositive) < .34, "Did not achieve <34% false positive"
+    assert min(percFalseNegative) < .02, "Did not achieve <2% false negative"
+        
 
 def perc(numCorrect, numIncorect):
-    return '{:.2%}'.format(numCorrect / (numCorrect+numIncorect))
+    return numCorrect / (numCorrect+numIncorect)
+
+def fmtPerc(n):
+    return '{:.2%}'.format(n)
 
 def loadData(csvFilename, dtype=np.int16):
     indptr = [0]
@@ -100,10 +101,5 @@ def logTime(label, start, totalTime):
     start = end   
     return (start, totalTime)
 
-if __name__ == '__main__':
-    print('label', 'calc', 'numCorrect', 'numIncorrect', '%', 'tn', 'fp', '%', 'fn', 'tp', '%', sep=",")
-    test_lympho()
-    test_wbc()
-    test_letter()
-    test_glass()
+
     
