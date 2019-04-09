@@ -289,4 +289,6 @@ def matrixEquals(m1, m2):
 
 if __name__ == '__main__':
     test_slim_sparse_count()
-    test_slim_dense_count()
+    
+    
+    

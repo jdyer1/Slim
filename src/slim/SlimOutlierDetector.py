@@ -68,6 +68,9 @@ class SlimOutlierDetector(BaseEstimator):
         '''
         Cantelli's Inequality. see [2] sec 2.4
         '''
+        if self.stddev_ == 0:
+            return 0
+        
         k = (length - self.mean_) / self.stddev_
         confidence = 1.0 / (1.0 + k**2)
         return confidence
@@ -137,7 +140,7 @@ class SlimOutlierDetector(BaseEstimator):
         scores = self.decision_function(X)
         is_inlier = np.ones(len(scores), dtype=int)
         for i in range(0, len(scores)):
-            is_inlier[i] = 1 if scores[i] > self.confidence_ else -1
+            is_inlier[i] = 1 if scores[i] >= self.confidence_ else -1
         return is_inlier
 
     

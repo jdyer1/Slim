@@ -22,6 +22,13 @@ class Slim(BaseEstimator, TransformerMixin):
     
     na_value : number, optional (default=0)
         - Specify a value to ignore, in addition to None.
+        
+    stop_threshold : number, optional (defaut=None)
+        - Specify a percentage gain subsequent iterations must achieve before stopping
+            (based on the gain achieved with the first iteration)
+    
+    prune_code_table : boolean, optional (default=True)
+        - prune code-table of those items that do not longer acheive gain?
     
     Attributes
     ----------
@@ -43,10 +50,12 @@ class Slim(BaseEstimator, TransformerMixin):
             SLIM: Directly mining description patterns. SDM12.
                 
     '''
-    def __init__(self, method="count", na_value=0):
+    def __init__(self, method="count", na_value=0, stop_threshold=None, prune_code_table=True):
         method = "count" if method is None else method
         self.cl_ = LengthCalculator(method=method)
         self.na_value_ = na_value
+        self.stop_threshold_ = stop_threshold
+        self.prune_code_table_ = prune_code_table
         
         self.totalFeatures_ = None
         self.totalElements_ = 0   
@@ -60,7 +69,7 @@ class Slim(BaseEstimator, TransformerMixin):
         
         self.featureDescById_ = None
         self.codeTable_ = None
-        self.candidates_ = None        
+        self.candidates_ = None     
     
     def fit(self, X, y=None):
         X = check_array(X, accept_sparse=['csr'])
@@ -80,7 +89,9 @@ class Slim(BaseEstimator, TransformerMixin):
             
             feature = Feature(featureId, 1,set([featureId]))
             feature.exampleIds = exampleIds
+            feature.originalExampleIds = exampleIds
             feature.support = len(exampleIds)
+            feature.totalSupport = feature.support
             
             (feature.standardCodeLength, feature.databaseLength) = \
                 self.cl_.computeLengths(feature.support, feature.cardinality, self.totalElements_)
@@ -101,6 +112,7 @@ class Slim(BaseEstimator, TransformerMixin):
         self.numberEvaluatedCandidates_ = 0
         
         iterationNum = 1
+        firstIterGain = 0
                     
         while len(self.candidates_) > 0:     
             candidate = self.candidates_[0]
@@ -120,6 +132,7 @@ class Slim(BaseEstimator, TransformerMixin):
             newFeature = self.addNewFeature(candidate)
             
             new_candidates = []
+            thisIterGain = 0
             for candidate1 in self.candidates_:
                 if candidate1.i_feature.support == 0 or candidate1.j_feature.support == 0:
                     continue
@@ -133,13 +146,21 @@ class Slim(BaseEstimator, TransformerMixin):
                     
                 if candidate1.estimatedGain < 0:
                     new_candidates.append(candidate1)
+                    thisIterGain += candidate1.estimatedGain
+            
+            if self.stop_threshold_ is not None:    
+                if iterationNum==1:
+                    firstIterGain = abs(thisIterGain * self.stop_threshold_)            
+                elif abs(thisIterGain) < firstIterGain:
+                    break
             
             self.candidates_ = sorted(new_candidates)              
             
             iterationNum += 1
-            self.generateCandidates(newFeature)
+            self.generateCandidates(newFeature) 
         
-        self.pruneCodeTable()
+        if self.prune_code_table_:
+            self.pruneCodeTable()
         self.codeTable_ = sorted(self.codeTable_)
         
         return self
@@ -173,6 +194,7 @@ class Slim(BaseEstimator, TransformerMixin):
                     featureIds = featureIds.difference(f.components)
                     f.exampleIds.add(exampleId)
                     f.support = f.support + 1
+                    f.totalSupport = f.support
                        
                 
         return self.do_transform(codeTable)
@@ -233,7 +255,7 @@ class Slim(BaseEstimator, TransformerMixin):
         
         return dict(featureDescById)
     
-    def loadData(self, X, y=None, returnXref=False):
+    def loadData(self, X, y=None, returnXref=True):
         if y is not None:
             y = check_array(y, accept_sparse=True, ensure_2d=False, allow_nd=True, ensure_min_samples=0, ensure_min_features=0)
             if len(y)>0:
@@ -336,9 +358,17 @@ class Slim(BaseEstimator, TransformerMixin):
         components = set(candidate.i_feature.components).union(candidate.j_feature.components)        
         cardinality = len(components)
         f = Feature(self.nextFeatureId_, cardinality, components)
+        f.leftTotalSupport = candidate.i_feature.totalSupport
+        f.rightTotalSupport = candidate.j_feature.totalSupport
+        f.leftSupport = candidate.i_feature.support
+        f.rightSupport = candidate.j_feature.support
         f.exampleIds = candidate.exampleIds
         f.standardCodeLength = candidate.standardCodeLength           
-        f.support = candidate.support     
+        f.support = candidate.support 
+        if candidate.i_feature.originalExampleIds is None or candidate.j_feature.originalExampleIds is None:
+            f.totalSupport = f.support
+        else:
+            f.totalSupport = len(candidate.i_feature.originalExampleIds.intersection(candidate.j_feature.originalExampleIds))  
         f.databaseLength = candidate.databaseLength
         
         self.nextFeatureId_ += 1
@@ -537,11 +567,16 @@ class Feature:
         self.cardinality = cardinality
         self.components = components
         self.exampleIds = set()
+        self.originalExampleIds = None
         self.standardCodeLength = 0 
         self.support = 0
-        self.databaseLength = 0       
-        
-    
+        self.totalSupport = 0
+        self.leftSupport = None
+        self.rightSupport = None
+        self.leftTotalSupport = None
+        self.rightTotalSupport = None
+        self.databaseLength = 0 
+            
     def __lt__(self, that):
         # Standard Cover Order, sec 2.3
         val =  that.cardinality - self.cardinality
@@ -559,7 +594,8 @@ class Feature:
         return Feature(self.featureId, self.cardinality, self.components)
                             
     def __str__(self):
-        return "[featureId: " + str(self.featureId) + " /support: " + str(self.support) + " /components: " + str(self.components) + "]"
+        return "[featureId: " + str(self.featureId) + " /support: " + str(self.support) + \
+            " /totalSupport: " + str(self.totalSupport)+ " /components: " + str(self.components) + "]"
     
    
     

@@ -101,5 +101,8 @@ def logTime(label, start, totalTime):
     start = end   
     return (start, totalTime)
 
-
+if __name__ == '__main__':
+    test_lympho()
+    test_glass()
+    test_wbc()
     
